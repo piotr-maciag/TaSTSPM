@@ -8,9 +8,9 @@ def tastsp_algorithm(D, F, R, T, theta, stq):
         if is_subsequence_of_previously_tested_sequence(s, stq):
             continue
         s_PI = 0
-        for i in range(1, len(s)):
-            s[i].I = calculate_I(s[i])
-            s_PI = min(s_PI, PR(s, i))
+        for i in range(0, len(s)):
+            s.calculate_I(i, D, R, T)
+            s_PI = min(s_PI, PR(s, i, D))
             if s_PI < theta:
                 return set()  # No TaSTSPs matching stq and theta
         s.PI = s_PI
@@ -23,12 +23,14 @@ def tastsp_algorithm(D, F, R, T, theta, stq):
     # Apply the fourth pruning strategy
     for i in range(len(stq)):
         for j in range(i + 1, len(stq)):
-            if stq[i][-1].T_min > stq[j][0].T_max:
+            T_min = D.get_times(stq[i][-1].event_type)[0]
+            T_max = D.get_times(stq[j][0].event_type)[1]
+            if T_min > T_max:
                 return set()  # No TaSTSPs matching stq and theta
 
     s1 = stq[0]
     S = set()
-    S = extend_forward(S, s1, D, F, R, T, theta)
+    S = extend_forward(S, s1, D, F, R, T, theta, 1, stq)
 
     if not S:
         return set()
@@ -41,66 +43,56 @@ def tastsp_algorithm(D, F, R, T, theta, stq):
     return TaSTSPs
 
 
-def extend_forward(S, s, D, F, R, T, theta, index=1, stq=None):
+def extend_forward(S, s: Sequence, D, F, R, T, theta, index=1, stq=None):
     for f in F:
-        s_star = s + [f]
+        s_star = s.add_element(Element(f))
         L = len(s_star)
-        s_star[-1].I = calculate_I(s_star[-1])
-        s_star_PI = min(s.PI, PR(s_star, L))
+        s_star.calculate_I(L - 1, D, R, T)
+        s_star.PI = min(s.PI, PR(s_star, L - 1, D))
 
-        if s_star_PI >= theta:
-            if stq and index <= len(stq):
-                s_index = stq[index - 1]
-                if s_star[-1] == s_index[0]:
+        if s_star.PI >= theta:
+            if stq and index < len(stq):
+                s_index = stq[index]
+                if s_star[-1].event_type == s_index[0].event_type:
                     s_double_star = s_star.copy()
-                    s_double_star_PI = s_star_PI
                     for k in range(1, len(s_index)):
-                        s_double_star.append(s_index[k])
+                        s_double_star.add_element(s_index[k])
                         L = len(s_double_star)
-                        s_double_star[-1].I = calculate_I(s_double_star[-1])
-                        s_double_star_PI = min(s_double_star_PI, PR(s_double_star, L))
-                        if s_double_star_PI < theta:
-                            break
-                    else:
-                        S = extend_forward(S, s_double_star, D, F, R, T, theta, index + 1, stq)
+                        s_double_star.calculate_I(L - 1, D, R, T)
+                        s_double_star.PI = min(s_double_star.PI, PR(s_double_star, L - 1, D))
 
+                    if s_double_star.PI >= theta:
+                        S = extend_forward(S, s_double_star, D, F, R, T, theta, index + 1, stq)
             S = extend_forward(S, s_star, D, F, R, T, theta, index, stq)
 
-    if index > len(stq):
-        S.add(tuple(s))
+    if index >= len(stq):
+        S.add(s)
 
     return S
 
 
 def extend_backward(S_E, s1, D, F, R, T, theta):
     for f in F:
-        s = [f] + s1
-        s[0].I = calculate_I(s[0])
-        s_PI = min(s1.PI, PR(s, 1))
+        s = s1.add_element_at_beginning(Element(f))
+        s.calculate_I(0, D, R, T)
+        s.PI = min(s1.PI, PR(s, 0))
 
-        if s_PI >= theta:
+        if s.PI >= theta:
             S_E = extend_backward(S_E, s, D, F, R, T, theta)
 
-    S_E.add(tuple(s1))
+    S_E.add(s1)
 
     return S_E
 
 
-def calculate_I(event_instance):
-    # Placeholder function for calculating I
-    pass
+def PR(sequence: Sequence, index, D: Dataset):
+    return len(sequence[index].I) / len(D[sequence[index].event_type])
 
 
-def PR(sequence, index):
-    # Placeholder function for calculating PR
-    pass
-
-
-def is_subsequence_of_previously_tested_sequence(seq, stq):
-
+def is_subsequence_of_previously_tested_sequence(sequence: Sequence, stq):
     for s in stq:
-        while seq != s:
-            if seq in s:
+        while sequence != s:
+            if sequence.is_subsequence_of(s):
                 return True
-
+    return False
     pass
