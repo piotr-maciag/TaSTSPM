@@ -1,5 +1,6 @@
 import math
 import difflib
+import pandas as pd
 
 class Event:
     def __init__(self, instance_id, event_type, x_location, y_location, occurrence_time):
@@ -21,14 +22,16 @@ class Event:
             return True
         return False
 
+    def __str__(self):
+        return (f"Event(ID: {self.instance_id}, Type: {self.event_type}, Time: {self.occurrence_time}, "
+                f"Location: ({self.x_location}, {self.y_location}))")
+
 class Dataset:
-    def __init__(self, dataset_dict=None, times_dict=None):
-        if dataset_dict is None:
-            dataset_dict = {}
-        self.dataset_dict = dataset_dict
-        if times_dict is None:
-            times_dict = {}
-        self.times_dict = times_dict
+    def __init__(self, file_path=None):
+        self.dataset_dict = {}
+        self.times_dict = {}
+        if file_path:
+            self.load_data(file_path)
 
     def add_event(self, event: Event):
         if isinstance(event, Event):
@@ -56,11 +59,33 @@ class Dataset:
         for event_type, events in self.dataset_dict.items():
             report_lines.append(f"Event Type: {event_type}, Number of Events: {len(events)}")
             for event in events:
-                report_lines.append(f"\tEvent ID: {event.instance_id}, Time: {event.occurrence_time}, Location: ({event.x_location}, {event.y_location})")
-        report_lines.append("\nTime Ranges:")
+                 print(event)
         for event_type, times in self.times_dict.items():
-            report_lines.append(f"Event Type: {event_type}, Time Range: {times}")
+             report_lines.append(f"Event Type: {event_type}, Time Range: ({times[0]}, {times[1]})")
         return "\n".join(report_lines)
+
+    def load_data(self, file_path):
+        print(f"Loading data from {file_path}")
+
+        # Read the space-separated CSV file
+        try:
+            df = pd.read_csv(file_path, delimiter=' ')
+            print(f"Data read successfully: {df.shape[0]} rows")
+        except Exception as e:
+            print(f"Failed to read data: {e}")
+            return
+
+        # Iterate over each row in the DataFrame and create Event instances
+        for _, row in df.iterrows():
+            event = Event(
+                instance_id=row['Instance_ID'],
+                event_type=str(row['Event_type']),
+                occurrence_time=row['Occurrence_time'],
+                x_location=row['Location_X'],
+                y_location=row['Location_Y']
+            )
+
+            self.add_event(event)
 
 class Element:
     def __init__(self, event_type, I : set = None):
