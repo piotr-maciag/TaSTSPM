@@ -69,7 +69,7 @@ class Dataset:
 
         # Read the space-separated CSV file
         try:
-            df = pd.read_csv(file_path, delimiter=' ')
+            df = pd.read_csv(file_path, delimiter=',')
             print(f"Data read successfully: {df.shape[0]} rows")
         except Exception as e:
             print(f"Failed to read data: {e}")
@@ -103,11 +103,15 @@ class Element:
         return False
 
 class Sequence:
-    def __init__(self, elements=None):
-        if elements is None:
-            self.elements = list()
-        self.elements=elements
-        self.PI = 0  # PI value for the sequence
+    def __init__(self, elements=None, event_types=None):
+        if elements is not None:
+            self.elements = elements
+        elif event_types is not None:
+            self.elements = [Element(event_type) for event_type in event_types]
+        else:
+            self.elements = []
+
+        self.PI = 1  # PI value for the sequence
 
     def __len__(self):
         return len(self.elements)
@@ -117,7 +121,9 @@ class Sequence:
 
     def __eq__(self, other):
         if isinstance(other, Sequence):
-            return self.elements == other.elements
+            if len(self.elements) != len(other.elements):
+                return False
+            return all(self_el.event_type == other_el.event_type for self_el, other_el in zip(self.elements, other.elements))
         return False
 
     def add_element(self, element:Element):
@@ -126,24 +132,25 @@ class Sequence:
     def add_element_at_begining(self, element:Element):
         self.elements.insert(0, element)
 
-    def calculate_PI(self, PR_func, R, T):
-        self.PI = 0
-        for i in range(1, len(self.elements)):
-            self.elements[i].I = self.calculate_I(self.elements[i], i, R, T)
-            self.PI = min(self.PI, PR_func(self, i))
+    def calculate_PI(self, PR_func, D, R, T):
+        self.PI = 1
+        for i in range(0, len(self.elements)):
+            self.calculate_I(i, D, R, T)
+            self.PI = min(self.PI, PR_func(self, i, D))
         pass
 
     def calculate_I(self, index, D, R, T):
+        self.elements[index].I = set()
         if index == 0:
-            self.elements[index].I = D.get_instances(self.elements[index].event_type)
+            self.elements[index].I = D[self.elements[index].event_type]
         else:
-            neighborhoods = [self.calculate_neighborhood(event, index, D, R, T) for event in self.events[index-1]]
+            neighborhoods = [self.calculate_neighborhood(event, index, D, R, T) for event in self.elements[index-1].I]
             merged_neighborhood = set().union(*neighborhoods)
             self.elements[index].I = merged_neighborhood
         pass
 
     def calculate_neighborhood(self, event, index, D, R, T):
-        return {e for e in D.get_instances(self.elements[index].event_type)
+        return {e for e in D[self.elements[index].event_type]
                 if event.is_within_spatiotemporal_distance(e, R, T)}
 
     def is_supersequence_of(self, other):
@@ -169,6 +176,9 @@ class Sequence:
     def __str__(self):
         elements_str = "\n".join(str(e) for e in self.elements)
         return f"Sequence:\n{elements_str}\nPI: {self.PI}"
+
+    def __hash__(self):
+        return hash(tuple(self.elements))
 
 
 #%%

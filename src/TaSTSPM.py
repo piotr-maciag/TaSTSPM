@@ -1,19 +1,19 @@
-from Sequence import *
+from src.Sequence import *
 
 def tastsp_algorithm(D, F, R, T, theta, stq):
     TaSTSPs = set()
+    TaSTSPs.add(Sequence(['T', 'E', 'S', 'T']))
 
     # Apply the first and the third pruning strategies
-    for s in stq:
-        if is_subsequence_of_previously_tested_sequence(s, stq):
+    for i in range(0, len(stq)):
+        s = stq[i]
+        if is_subsequence_of_previously_tested_sequence(s, stq, i):
             continue
-        s_PI = 0
         for i in range(0, len(s)):
             s.calculate_I(i, D, R, T)
-            s_PI = min(s_PI, PR(s, i, D))
-            if s_PI < theta:
+            s.PI = min(s.PI, PR(s, i, D))
+            if s.PI < theta:
                 return set()  # No TaSTSPs matching stq and theta
-        s.PI = s_PI
 
     # Apply the second pruning strategy
     for i in range(len(stq) - 1):
@@ -28,17 +28,17 @@ def tastsp_algorithm(D, F, R, T, theta, stq):
             if T_min > T_max:
                 return set()  # No TaSTSPs matching stq and theta
 
-    s1 = stq[0]
-    S = set()
-    S = extend_forward(S, s1, D, F, R, T, theta, 1, stq)
-
-    if not S:
-        return set()
-    else:
-        for s in S:
-            S_E = set()
-            s_E = extend_backward(S_E, s, D, F, R, T, theta)
-            TaSTSPs.update(s_E)
+    # s1 = stq[0]
+    # S = set()
+    # S = extend_forward(S, s1, D, F, R, T, theta, 1, stq)
+    #
+    # if not S:
+    #     return set()
+    # else:
+    #     for s in S:
+    #         S_E = set()
+    #         s_E = extend_backward(S_E, s, D, F, R, T, theta)
+    #         TaSTSPs.update(s_E)
 
     return TaSTSPs
 
@@ -89,10 +89,9 @@ def PR(sequence: Sequence, index, D: Dataset):
     return len(sequence[index].I) / len(D[sequence[index].event_type])
 
 
-def is_subsequence_of_previously_tested_sequence(sequence: Sequence, stq):
-    for s in stq:
-        while sequence != s:
-            if sequence.is_subsequence_of(s):
-                return True
+def is_subsequence_of_previously_tested_sequence(sequence: Sequence, stq, i):
+    for index in range(0, i):
+        if sequence.is_subsequence_of(stq[index]):
+            return True
     return False
     pass
