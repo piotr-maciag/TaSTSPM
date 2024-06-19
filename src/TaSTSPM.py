@@ -1,5 +1,6 @@
 from src.Sequence import *
 
+
 def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
     if verbose > 0:
         print("Starting TaSTSP Algorithm")
@@ -16,23 +17,23 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
                 print(f"Skipping sequence {i} as it is a subsequence of a previously tested sequence.")
             continue
         if verbose > 1:
-            print(f"Calculating I and PI for sequence {i}")
+            print(f"Calculating I and PI for sequence {s}, Index={i}")
 
         for j in range(0, len(s)):
             s.calculate_I(j, D, R, T)
             s.PI = min(s.PI, PR(s, j, D))
             if verbose > 2:
-                print(f"Sequence {i}, Element {j}: PI={s.PI}")
+                print(f"Sequence {s}, Element {j}: PI={s.PI}")
             if s.PI < theta:
                 if verbose > 0:
-                    print(f"Sequence {i} pruned due to PI < theta")
+                    print(f"Sequence {s} pruned due to PI < theta")
                 return set()  # No TaSTSPs matching stq and theta
 
     # Apply the second pruning strategy
     for i in range(len(stq) - 1):
         if stq[i][-1].I == set():
             if verbose > 0:
-                print(f"Sequence {i} pruned due to empty I set")
+                print(f"Sequence {stq[i]} pruned due to empty I set")
             return set()  # No TaSTSPs matching stq and theta
 
     # Apply the fourth pruning strategy
@@ -42,7 +43,7 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
             T_max = D.get_times(stq[j][0].event_type)[1]
             if T_min > T_max:
                 if verbose > 0:
-                    print(f"Sequences {i} and {j} pruned due to T_min > T_max")
+                    print(f"Sequences {stq[i]} and {stq[j]} pruned due to T_min > T_max")
                 return set()  # No TaSTSPs matching stq and theta
 
     s1 = stq[0]
@@ -54,7 +55,6 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
             print("No sequences found after forward extension")
         return set()
     else:
-
         for s in S:
             S_E = set()
             s_E = extend_backward(S_E, s, D, F, R, T, theta, verbose)

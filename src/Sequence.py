@@ -2,6 +2,8 @@ import math
 import difflib
 import pandas as pd
 
+
+
 class Event:
     def __init__(self, instance_id, event_type, x_location, y_location, occurrence_time):
         self.event_type = event_type
@@ -131,7 +133,7 @@ class Element:
         self.I = I
 
     def __repr__(self):
-        return (f"Element(type={self.event_type}, len(I)={len(self.I)}, "
+        return (f"Element(type={self.event_type}, len(I)={len(self.I)})"
                 #f"I_ids={[e.instance_id for e in self.I]})"
                 )
 
@@ -144,8 +146,12 @@ class Element:
         return hash(self.event_type)
 
 
+
+
+import concurrent.futures
+
 class Sequence:
-    def __init__(self, event_types=None, elements=None):
+    def __init__(self, elements=None, event_types=None):
         if elements is not None:
             self.elements = elements
         elif event_types is not None:
@@ -163,23 +169,17 @@ class Sequence:
 
     def __eq__(self, other):
         if isinstance(other, Sequence):
-            if len(self.elements) != len(other.elements):
-                return False
-            return all(self_el.event_type == other_el.event_type for self_el, other_el in zip(self.elements, other.elements))
+            return self.elements == other.elements
         return False
 
-    def add_element(self, element:Element):
+    def __hash__(self):
+        return hash(tuple(self.elements))
+
+    def add_element(self, element: Element):
         self.elements.append(element)
 
-    def add_element_at_beginning(self, element:Element):
+    def add_element_at_beginning(self, element: Element):
         self.elements.insert(0, element)
-
-    def calculate_PI(self, PR_func, D, R, T):
-        self.PI = 1
-        for i in range(0, len(self.elements)):
-            self.calculate_I(i, D, R, T)
-            self.PI = min(self.PI, PR_func(self, i, D))
-        pass
 
     def calculate_I(self, index, D, R, T):
         self.elements[index].I = set()
@@ -199,20 +199,20 @@ class Sequence:
         pass
 
     def calculate_neighborhood(self, event, index, D, R, T):
-        return {e for e in D[self.elements[index].event_type]
-                if event.is_within_spatiotemporal_distance(e, R, T)}
+        return {e for e in D[self.elements[index].event_type] if event.is_within_spatiotemporal_distance(e, R, T)}
 
     def calculate_backward_neighborhood(self, event, index, D, R, T):
-        return {e for e in D[self.elements[index].event_type]
-                if event.is_within_backward_spatiotemporal_distance(e, R, T)}
+        return {e for e in D[self.elements[index].event_type] if event.is_within_spatiotemporal_distance(e, R, T)}
 
-    def is_supersequence_of(self, other):
-        # Check if self is a subsequence of other sequence
-        event_types = [el.event_type for el in self.elements]
-        other_event_types = [el.event_type for el in other.elements]
-        s = difflib.SequenceMatcher(None, event_types, other_event_types)
-        match = s.find_longest_match(0, len(event_types), 0, len(other_event_types))
-        return match.size == len(other_event_types) and match.b == 0
+    def calculate_PI(self, PR_func, D, R, T):
+        self.PI = 1
+        for i in range(0, len(self.elements)):
+            self.calculate_I(i, D, R, T)
+            self.PI = min(self.PI, PR_func(self, i, D))
+        pass
+
+    def copy(self):
+        return Sequence(elements=[Element(e.event_type, e.I.copy()) for e in self.elements])
 
     def is_subsequence_of(self, other):
         # Check if self is a subsequence of other sequence
@@ -222,19 +222,19 @@ class Sequence:
         match = s.find_longest_match(0, len(other_event_types), 0, len(event_types))
         return match.size == len(event_types) and match.b == 0
 
+    def is_supersequence_of(self, other):
+        # Check if self is a supersequence of another sequence
+        event_types = [el.event_type for el in self.elements]
+        other_event_types = [el.event_type for el in other.elements]
+        s = difflib.SequenceMatcher(None, event_types, other_event_types)
+        match = s.find_longest_match(0, len(event_types), 0, len(other_event_types))
+        return match.size == len(other_event_types) and match.b == 0
+
     def __repr__(self):
-        elements_repr = ", ".join(repr(e) for e in self.elements)
-        return f"Sequence(elements=[{elements_repr}], PI={self.PI})"
+        return f"Sequence(elements=[{', '.join(repr(e) for e in self.elements)}], PI={self.PI})"
 
     def __str__(self):
-        elements_str = "\n".join(str(e) for e in self.elements)
-        return f"Sequence:\n{elements_str}\nPI: {self.PI}"
+        str = (' -> '.join(e.event_type for e in self.elements))
+        return f"{str}, PI={self.PI}"
 
-    def __hash__(self):
-        return hash(tuple(self.elements))
-
-    def copy(self):
-        return Sequence(elements=[Element(e.event_type, e.I.copy()) for e in self.elements])
-
-
-#%%
+        #%%
