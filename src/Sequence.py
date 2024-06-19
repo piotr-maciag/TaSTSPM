@@ -184,24 +184,18 @@ class Sequence:
     def calculate_I(self, index, D, R, T):
         self.elements[index].I = set()
         if index == 0:
-            self.elements[index].I = {e for e in D[self.elements[index].event_type]}
+            self.elements[index].I = D[self.elements[index].event_type]
         else:
             neighborhoods = [self.calculate_neighborhood(event, index, D, R, T) for event in self.elements[index - 1].I]
-            merged_neighborhood = {}
-            for neighborhood in neighborhoods:
-                for e in neighborhood:
-                    merged_neighborhood[e.instance_id] = e
-            self.elements[index].I = set(merged_neighborhood.values())
+            merged_neighborhood = set().union(*neighborhoods)
+            self.elements[index].I = merged_neighborhood
         pass
 
     def calculate_I_backward(self, index, D, R, T):
         self.elements[index].I = set()
         neighborhoods = [self.calculate_backward_neighborhood(event, index, D, R, T) for event in self.elements[index + 1].I]
-        merged_neighborhood = {}
-        for neighborhood in neighborhoods:
-            for e in neighborhood:
-                merged_neighborhood[e.instance_id] = e
-        self.elements[index].I = set(merged_neighborhood.values())
+        merged_neighborhood = set().union(*neighborhoods)
+        self.elements[index].I = merged_neighborhood
         pass
 
     def calculate_neighborhood(self, event, index, D, R, T):
