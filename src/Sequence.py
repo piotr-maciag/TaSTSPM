@@ -10,17 +10,53 @@ class Event:
         self.y_location = y_location
         self.instance_id = instance_id
 
-    def is_within_spatiotemporal_distance(self, e, R, T):
+    def is_within_backward_spatiotemporal_distance(self, e, R, T, distance_type ='Earth'):
+
         # Calculate the spatial distance
-        spatial_distance = math.sqrt((self.x_location - e.x_location) ** 2 + (self.y_location - e.y_location) ** 2)
+        if distance_type == 'Earth':
+            spatial_distance = self.distanceEarth(e)
+        elif distance_type == 'Euclidean':
+            spatial_distance = self.distanceEuclidian(e)
+
+        # Calculate the time difference
+        time_difference =  self.occurrence_time - e.occurrence_time
+
+        # Check if the spatial distance is within R and time difference is within T
+        if spatial_distance <= R and self.occurrence_time > e.occurrence_time and time_difference < T:
+            return True
+        return False
+
+    def is_within_spatiotemporal_distance(self, e, R, T, distance_type ='Earth'):
+        # Calculate the spatial distance
+
+        if distance_type == 'Earth':
+            spatial_distance = self.distanceEarth(e)
+        elif distance_type == 'Euclidean':
+            spatial_distance = self.distanceEuclidian(e)
 
         # Calculate the time difference
         time_difference = e.occurrence_time - self.occurrence_time
 
         # Check if the spatial distance is within R and time difference is within T
-        if spatial_distance <= R and time_difference <= T:
+        if spatial_distance <= R and self.occurrence_time < e.occurrence_time and time_difference < T:
             return True
         return False
+
+    def distanceEuclidian(self, e):
+        return math.sqrt((self.x_location - e.x_location) ** 2 + (self.y_location - e.y_location) ** 2)
+
+    def distanceEarth(self, e):
+        def deg2rad(deg):
+            return deg * (math.pi / 180.0)
+
+        earthRadiusKm = 6371.0  # Radius of the Earth in kilometers
+        lat1r = deg2rad(self.y_location)
+        lon1r = deg2rad(self.x_location)
+        lat2r = deg2rad(e.y_location)
+        lon2r = deg2rad(e.x_location)
+        u = math.sin((lat2r - lat1r) / 2)
+        v = math.sin((lon2r - lon1r) / 2)
+        return 2.0 * earthRadiusKm * math.asin(math.sqrt(u * u + math.cos(lat1r) * math.cos(lat2r) * v * v)) * 1000
 
     def __str__(self):
         return (f"Event(ID: {self.instance_id}, Type: {self.event_type}, Time: {self.occurrence_time}, "
@@ -95,15 +131,21 @@ class Element:
         self.I = I
 
     def __repr__(self):
-        return f"Element(type={self.event_type}, I={self.I})"
+        return (f"Element(type={self.event_type}, len(I)={len(self.I)}, "
+                #f"I_ids={[e.instance_id for e in self.I]})"
+                )
 
     def __eq__(self, other):
         if isinstance(other, Element):
             return (self.event_type == other.event_type)
         return False
 
+    def __hash__(self):
+        return hash(self.event_type)
+
+
 class Sequence:
-    def __init__(self, elements=None, event_types=None):
+    def __init__(self, event_types=None, elements=None):
         if elements is not None:
             self.elements = elements
         elif event_types is not None:
@@ -129,7 +171,7 @@ class Sequence:
     def add_element(self, element:Element):
         self.elements.append(element)
 
-    def add_element_at_begining(self, element:Element):
+    def add_element_at_beginning(self, element:Element):
         self.elements.insert(0, element)
 
     def calculate_PI(self, PR_func, D, R, T):
@@ -142,16 +184,33 @@ class Sequence:
     def calculate_I(self, index, D, R, T):
         self.elements[index].I = set()
         if index == 0:
-            self.elements[index].I = D[self.elements[index].event_type]
+            self.elements[index].I = {e for e in D[self.elements[index].event_type]}
         else:
-            neighborhoods = [self.calculate_neighborhood(event, index, D, R, T) for event in self.elements[index-1].I]
-            merged_neighborhood = set().union(*neighborhoods)
-            self.elements[index].I = merged_neighborhood
+            neighborhoods = [self.calculate_neighborhood(event, index, D, R, T) for event in self.elements[index - 1].I]
+            merged_neighborhood = {}
+            for neighborhood in neighborhoods:
+                for e in neighborhood:
+                    merged_neighborhood[e.instance_id] = e
+            self.elements[index].I = set(merged_neighborhood.values())
+        pass
+
+    def calculate_I_backward(self, index, D, R, T):
+        self.elements[index].I = set()
+        neighborhoods = [self.calculate_backward_neighborhood(event, index, D, R, T) for event in self.elements[index + 1].I]
+        merged_neighborhood = {}
+        for neighborhood in neighborhoods:
+            for e in neighborhood:
+                merged_neighborhood[e.instance_id] = e
+        self.elements[index].I = set(merged_neighborhood.values())
         pass
 
     def calculate_neighborhood(self, event, index, D, R, T):
         return {e for e in D[self.elements[index].event_type]
                 if event.is_within_spatiotemporal_distance(e, R, T)}
+
+    def calculate_backward_neighborhood(self, event, index, D, R, T):
+        return {e for e in D[self.elements[index].event_type]
+                if event.is_within_backward_spatiotemporal_distance(e, R, T)}
 
     def is_supersequence_of(self, other):
         # Check if self is a subsequence of other sequence
@@ -179,6 +238,9 @@ class Sequence:
 
     def __hash__(self):
         return hash(tuple(self.elements))
+
+    def copy(self):
+        return Sequence(elements=[Element(e.event_type, e.I.copy()) for e in self.elements])
 
 
 #%%
