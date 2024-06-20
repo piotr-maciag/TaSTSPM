@@ -1,5 +1,5 @@
 from src.Sequence import *
-
+import concurrent.futures
 
 def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
     if verbose > 0:
@@ -17,23 +17,23 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
                 print(f"Skipping sequence {i} as it is a subsequence of a previously tested sequence.")
             continue
         if verbose > 1:
-            print(f"Calculating I and PI for sequence {s}, Index={i}")
+            print(f"Calculating I and PI for sequence {i}")
 
         for j in range(0, len(s)):
             s.calculate_I(j, D, R, T)
             s.PI = min(s.PI, PR(s, j, D))
             if verbose > 2:
-                print(f"Sequence {s}, Element {j}: PI={s.PI}")
+                print(f"Sequence {i}, Element {j}: PI={s.PI}")
             if s.PI < theta:
                 if verbose > 0:
-                    print(f"Sequence {s} pruned due to PI < theta")
+                    print(f"Sequence {i} pruned due to PI < theta")
                 return set()  # No TaSTSPs matching stq and theta
 
     # Apply the second pruning strategy
     for i in range(len(stq) - 1):
         if stq[i][-1].I == set():
             if verbose > 0:
-                print(f"Sequence {stq[i]} pruned due to empty I set")
+                print(f"Sequence {i} pruned due to empty I set")
             return set()  # No TaSTSPs matching stq and theta
 
     # Apply the fourth pruning strategy
@@ -43,7 +43,7 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
             T_max = D.get_times(stq[j][0].event_type)[1]
             if T_min > T_max:
                 if verbose > 0:
-                    print(f"Sequences {stq[i]} and {stq[j]} pruned due to T_min > T_max")
+                    print(f"Sequences {i} and {j} pruned due to T_min > T_max")
                 return set()  # No TaSTSPs matching stq and theta
 
     s1 = stq[0]
@@ -55,6 +55,8 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
             print("No sequences found after forward extension")
         return set()
     else:
+        if verbose > 0:
+            print("Forward extension completed")
         for s in S:
             S_E = set()
             s_E = extend_backward(S_E, s, D, F, R, T, theta, verbose)
@@ -66,7 +68,8 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
 
 def extend_forward(S, s: Sequence, D, F, R, T, theta, index=1, stq=None, verbose=0):
     if verbose > 1:
-        print(f"Extending forward: Sequence={s}, Index={index}")
+        event_types = ' -> '.join([el.event_type for el in s.elements])
+        print(f"Extending forward: Sequence={event_types}, Index={index}")
     for f in F:
         s_star = s.copy()
         s_star.add_element(Element(f))
@@ -75,7 +78,7 @@ def extend_forward(S, s: Sequence, D, F, R, T, theta, index=1, stq=None, verbose
         s_star.PI = min(s.PI, PR(s_star, L - 1, D))
 
         if verbose > 2:
-            print(f"Extended sequence: {s_star}, PI={s_star.PI}")
+            print(f"Extended sequence: {s_star}")
 
         if s_star.PI >= theta:
             if stq and index < len(stq):
@@ -89,7 +92,7 @@ def extend_forward(S, s: Sequence, D, F, R, T, theta, index=1, stq=None, verbose
                         s_double_star.PI = min(s_double_star.PI, PR(s_double_star, L - 1, D))
 
                         if verbose > 2:
-                            print(f"Extended sequence with stq: {s_double_star}, PI={s_double_star.PI}")
+                            print(f"Extended sequence with stq: {s_double_star}")
 
                     if s_double_star.PI >= theta:
                         S = extend_forward(S, s_double_star, D, F, R, T, theta, index + 1, stq, verbose)
@@ -102,16 +105,17 @@ def extend_forward(S, s: Sequence, D, F, R, T, theta, index=1, stq=None, verbose
 
 def extend_backward(S_E, s1, D, F, R, T, theta, verbose=0):
     if verbose > 1:
-        print(f"Extending backward: Sequence={s1}")
+        event_types = ' -> '.join([el.event_type for el in s1.elements])
+        print(f"Extending backward: Sequence={event_types}")
     for f in F:
         s = s1.copy()
         s.add_element_at_beginning(Element(f))
         s.calculate_I_backward(0, D, R, T)
-        s.calculate_I(1, D, R, T)
-        s.PI = min(s1.PI, PR(s, 0, D), PR(s, 1, D))
+        s.recalculate_I_and_PI(PR, 1, D, R, T)
+        #s.PI = min(s1.PI, PR(s, 0, D), PR(s, 1, D))
 
         if verbose > 2:
-            print(f"Extended backward sequence: {s}, PI={s.PI}")
+            print(f"Extended backward sequence: {s}")
 
         if s.PI >= theta:
             S_E = extend_backward(S_E, s, D, F, R, T, theta, verbose)

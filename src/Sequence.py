@@ -189,20 +189,31 @@ class Sequence:
             neighborhoods = [self.calculate_neighborhood(event, index, D, R, T) for event in self.elements[index - 1].I]
             merged_neighborhood = set().union(*neighborhoods)
             self.elements[index].I = merged_neighborhood
-        pass
 
     def calculate_I_backward(self, index, D, R, T):
         self.elements[index].I = set()
-        neighborhoods = [self.calculate_backward_neighborhood(event, index, D, R, T) for event in self.elements[index + 1].I]
+        neighborhoods = [self.calculate_neighborhood_backward(event, index, D, R, T) for event in self.elements[index + 1].I]
         merged_neighborhood = set().union(*neighborhoods)
         self.elements[index].I = merged_neighborhood
-        pass
 
     def calculate_neighborhood(self, event, index, D, R, T):
         return {e for e in D[self.elements[index].event_type] if event.is_within_spatiotemporal_distance(e, R, T)}
 
-    def calculate_backward_neighborhood(self, event, index, D, R, T):
-        return {e for e in D[self.elements[index].event_type] if event.is_within_spatiotemporal_distance(e, R, T)}
+    def calculate_neighborhood_I(self, event, index, R, T):
+        return {e for e in self.elements[index].I if event.is_within_spatiotemporal_distance(e, R, T)}
+
+    def calculate_neighborhood_backward(self, event, index, D, R, T):
+        return {e for e in D[self.elements[index].event_type] if event.is_within_backward_spatiotemporal_distance(e, R, T)}
+
+    def recalculate_I_and_PI(self, PR, index, D, R, T):
+        if index == 0:
+            self.elements[index].I = D[self.elements[index].event_type]
+        else:
+            neighborhoods = [self.calculate_neighborhood_I(event, index, R, T) for event in self.elements[index - 1].I]
+            merged_neighborhood = set().union(*neighborhoods)
+            self.elements[index].I = merged_neighborhood
+
+        self.calculate_PI(PR, D, R, T)
 
     def calculate_PI(self, PR_func, D, R, T):
         self.PI = 1
@@ -235,6 +246,6 @@ class Sequence:
 
     def __str__(self):
         str = (' -> '.join(e.event_type for e in self.elements))
-        return f"{str}, PI={self.PI}"
+        return f"{str}, PI: {self.PI}"
 
         #%%
