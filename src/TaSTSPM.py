@@ -22,6 +22,7 @@ def tastsp_algorithm(D, F, R, T, theta, stq, distance_type='Earth', verbose=0):
         for j in range(0, len(s)):
             s.calculate_I(j, D, R, T)
             s.PI = min(s.PI, PR(s, j, D))
+
             if verbose > 2:
                 print(f"Sequence {i}, Element {j}: PI={s.PI}")
             if s.PI < theta:
@@ -70,21 +71,24 @@ def extend_forward(S, s: Sequence, D, F, R, T, theta, index=1, stq=None, verbose
     if verbose > 1:
         event_types = ' -> '.join([el.event_type for el in s.elements])
         print(f"Extending forward: Sequence={event_types}, Index={index}")
+
     for f in F:
         s_star = s.copy()
         s_star.add_element(Element(f))
         L = len(s_star)
         s_star.calculate_I(L - 1, D, R, T)
-        s_star.PI = min(s.PI, PR(s_star, L - 1, D))
+        s_star.PI = min(s_star.PI, PR(s_star, L - 1, D))
 
         if verbose > 2:
             print(f"Extended sequence: {s_star}")
 
         if s_star.PI >= theta:
+
             if stq and index < len(stq):
                 s_index = stq[index]
                 if s_star[-1].event_type == s_index[0].event_type:
                     s_double_star = s_star.copy()
+
                     for k in range(1, len(s_index)):
                         s_double_star.add_element(s_index[k])
                         L = len(s_double_star)
@@ -112,7 +116,6 @@ def extend_backward(S_E, s1, D, F, R, T, theta, verbose=0):
         s.add_element_at_beginning(Element(f))
         s.calculate_I_backward(0, D, R, T)
         s.recalculate_I_and_PI(PR, 1, D, R, T)
-        #s.PI = min(s1.PI, PR(s, 0, D), PR(s, 1, D))
 
         if verbose > 2:
             print(f"Extended backward sequence: {s}")

@@ -1,6 +1,9 @@
 import math
 import difflib
 import pandas as pd
+from geopy.distance import geodesic
+import pandas as pd
+from collections import defaultdict
 
 
 
@@ -64,30 +67,37 @@ class Event:
         return (f"Event(ID: {self.instance_id}, Type: {self.event_type}, Time: {self.occurrence_time}, "
                 f"Location: ({self.x_location}, {self.y_location}))")
 
+
 class Dataset:
     def __init__(self, file_path=None):
-        self.dataset_dict = {}
+        self.dataset_dict = defaultdict(list)
         self.times_dict = {}
         if file_path:
             self.load_data(file_path)
 
-    def add_event(self, event: Event):
+    def add_event(self, event):
         if isinstance(event, Event):
             # Update dataset_dict
-            if event.event_type not in self.dataset_dict:
-                self.dataset_dict[event.event_type] = set()
-            self.dataset_dict[event.event_type].add(event)
+            self.dataset_dict[event.event_type].append(event)
 
             # Update times_dict
             if event.event_type not in self.times_dict:
                 self.times_dict[event.event_type] = (event.occurrence_time, event.occurrence_time)
             else:
                 min_time, max_time = self.times_dict[event.event_type]
-                self.times_dict[event.event_type] = \
-                    (min(min_time, event.occurrence_time), max(max_time, event.occurrence_time))
+                self.times_dict[event.event_type] = (
+                    min(min_time, event.occurrence_time), max(max_time, event.occurrence_time)
+                )
+
+    def sort_events(self):
+        for event_type in self.dataset_dict:
+            self.dataset_dict[event_type] = sorted(self.dataset_dict[event_type], key=lambda x: x.occurrence_time)
+
+    def get_sorted_events(self, event_type):
+        return self.dataset_dict[event_type]
 
     def __getitem__(self, event_type):
-        return self.dataset_dict[event_type]
+        return self.get_sorted_events(event_type)
 
     def get_times(self, event_type):
         return self.times_dict[event_type]
@@ -96,16 +106,14 @@ class Dataset:
         report_lines = []
         for event_type, events in self.dataset_dict.items():
             report_lines.append(f"Event Type: {event_type}, Number of Events: {len(events)}")
-            for event in events:
-                 print(event)
         for event_type, times in self.times_dict.items():
-             report_lines.append(f"Event Type: {event_type}, Time Range: ({times[0]}, {times[1]})")
+            report_lines.append(f"Event Type: {event_type}, Time Range: ({times[0]}, {times[1]})")
         return "\n".join(report_lines)
 
     def load_data(self, file_path):
         print(f"Loading data from {file_path}")
 
-        # Read the space-separated CSV file
+        # Read the comma-separated CSV file
         try:
             df = pd.read_csv(file_path, delimiter=',')
             print(f"Data read successfully: {df.shape[0]} rows")
@@ -124,6 +132,10 @@ class Dataset:
             )
 
             self.add_event(event)
+
+        # Ensure events are sorted by occurrence_time for each event type
+        self.sort_events()
+
 
 class Element:
     def __init__(self, event_type, I : set = None):
@@ -181,6 +193,88 @@ class Sequence:
     def add_element_at_beginning(self, element: Element):
         self.elements.insert(0, element)
 
+    def forward_sweep(self, tailEventSet, instancesSet, T, R):
+        joinResult = []
+        tailEventSet = sorted(tailEventSet, key=lambda x: x.occurrence_time)
+        instancesSet = sorted(instancesSet, key=lambda x: x.occurrence_time)
+
+        while tailEventSet and instancesSet:
+            p = tailEventSet[0]
+            q = instancesSet[0]
+
+            if p.occurrence_time < q.occurrence_time:
+                tailEventSet.pop(0)
+                for q in instancesSet:
+                    if p.occurrence_time + T > q.occurrence_time:
+                        dist = geodesic((p.y_location, p.x_location), (q.y_location, q.x_location)).meters
+                        if dist <= R:
+                            joinResult.append(q)
+            else:
+                instancesSet.pop(0)
+
+        # Remove duplicates by eventID, maintaining order
+        seen = set()
+        unique_joinResult = []
+        for event in joinResult:
+            if event.instance_id not in seen:
+                unique_joinResult.append(event)
+                seen.add(event.instance_id)
+
+        return unique_joinResult
+
+    def forward_sweep_D(self, tailEventSet, instancesSet, T, R):
+        joinResult = []
+        tailEventSet = sorted(tailEventSet, key=lambda x: x.occurrence_time)
+
+        while tailEventSet and instancesSet:
+            p = tailEventSet[0]
+            q = instancesSet[0]
+
+            if p.occurrence_time < q.occurrence_time:
+                tailEventSet.pop(0)
+                for q in instancesSet:
+                    if p.occurrence_time + T > q.occurrence_time:
+                        dist = geodesic((p.y_location, p.x_location), (q.y_location, q.x_location)).meters
+                        if dist <= R:
+                            joinResult.append(q)
+                else:
+                    instancesSet.pop(0)
+
+        # Remove duplicates by eventID, maintaining order
+        seen = set()
+        unique_joinResult = []
+        for event in joinResult:
+            if event.instance_id not in seen:
+                unique_joinResult.append(event)
+                seen.add(event.instance_id)
+
+        return unique_joinResult
+
+    def calculate_I_sweep(self, index, D, R, T):
+        self.elements[index].I = set()
+        if index == 0:
+            self.elements[index].I = set(D[self.elements[index].event_type])
+        else:
+            previous_events = list(self.elements[index - 1].I)
+            current_events = D[self.elements[index].event_type]
+            self.elements[index].I = self.forward_sweep_D(previous_events, current_events, T, R)
+
+    def calculate_PI_sweep(self, PR_func, D, R, T):
+        self.PI = 1
+        for i in range(len(self.elements)):
+            self.calculate_I_sweep(i, D, R, T)
+            self.PI = min(self.PI, PR_func(self, i, D))
+
+    def recalculate_I_and_PI_sweep(self, PR_func, index, D, R, T):
+        if index == 0:
+            self.elements[index].I = D[self.elements[index].event_type]
+        else:
+            previous_events = list(self.elements[index - 1].I)
+            current_events = list(self.elements[index].I)
+            self.elements[index].I = self.forward_sweep(previous_events, current_events, T, R)
+
+        self.calculate_PI(PR_func, D, R, T)
+
     def calculate_I(self, index, D, R, T):
         self.elements[index].I = set()
         if index == 0:
@@ -218,12 +312,14 @@ class Sequence:
     def calculate_PI(self, PR_func, D, R, T):
         self.PI = 1
         for i in range(0, len(self.elements)):
-            self.calculate_I(i, D, R, T)
+            # self.calculate_I(i, D, R, T)
             self.PI = min(self.PI, PR_func(self, i, D))
         pass
 
     def copy(self):
-        return Sequence(elements=[Element(e.event_type, e.I.copy()) for e in self.elements])
+        s = Sequence(elements=[Element(e.event_type, e.I.copy()) for e in self.elements])
+        s.PI = self.PI
+        return s
 
     def is_subsequence_of(self, other):
         # Check if self is a subsequence of other sequence

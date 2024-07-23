@@ -25,7 +25,7 @@ def CST_SPMiner(dataset, theta, T, R, verbose=0):
 
     SequencesSetSPTree.append(Length1Seq)
 
-    if verbose > 0:
+    if verbose > 1:
         print("Created 1-length sequences")
 
     for i in range(len(Length1Seq)):
@@ -45,10 +45,10 @@ def CST_SPMiner(dataset, theta, T, R, verbose=0):
                     seq.firstParent.children.append(seq)
                     Length2Seq.append(seq)
 
-                    if verbose > 1:
-                        print(f"Created 2-length sequence: {seq}")
-
     SequencesSetSPTree.append(Length2Seq)
+
+    if verbose > 1:
+        print(f"Created 2-length sequences")
 
     k = 1
     while SequencesSetSPTree[k]:
@@ -56,8 +56,8 @@ def CST_SPMiner(dataset, theta, T, R, verbose=0):
         LengthKSeq = gen_and_verify(SequencesSetSPTree[k - 1], dataset, theta, T, R)
         SequencesSetSPTree.append(LengthKSeq)
 
-        if verbose > 0:
-            print(f"Created {k}-length sequences")
+        if verbose > 1:
+            print(f"Created {k+1}-length sequences")
 
     if verbose > 0:
         print("CST_SPMiner Algorithm Completed")
@@ -109,7 +109,7 @@ def STBFM(dataset, theta, T, R, verbose=0):
 
     SequencesSetSPTree.append(Length1Seq)
 
-    if verbose > 0:
+    if verbose > 1:
         print("Created 1-length sequences")
 
     for i in range(len(Length1Seq)):
@@ -129,10 +129,10 @@ def STBFM(dataset, theta, T, R, verbose=0):
                     seq.firstParent.children.append(seq)
                     Length2Seq.append(seq)
 
-                    if verbose > 1:
-                        print(f"Created 2-length sequence: {seq}")
-
     SequencesSetSPTree.append(Length2Seq)
+
+    if verbose > 1:
+        print(f"Created 2-length sequences")
 
     k = 1
     while SequencesSetSPTree[k]:
@@ -140,8 +140,8 @@ def STBFM(dataset, theta, T, R, verbose=0):
         LengthKSeq = gen_and_verify(SequencesSetSPTree[k - 1], dataset, theta, T, R)
         SequencesSetSPTree.append(LengthKSeq)
 
-        if verbose > 0:
-            print(f"Created {k}-length sequences")
+        if verbose > 1:
+            print(f"Created {k+1}-length sequences")
 
     if verbose > 0:
         print("STBFM Algorithm Completed")
